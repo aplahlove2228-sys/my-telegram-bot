@@ -1,9 +1,9 @@
-import logging
+															import logging
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from flask import Flask
-from threading import Thread
+import threading
 
 # ⬇️ TOKEN از Environment Variable
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8956666860:AAHzvS0-eBvMAPpVNQsxIr80jKC8wdmxrtI")
@@ -13,6 +13,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
 # Flask app برای Keep Alive
 app = Flask(__name__)
@@ -37,22 +38,32 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"تو گفتی: {update.message.text}")
 
-# اجرای ربات
 def run_bot():
-    application = Application.builder().token(BOT_TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-    
-    print("🤖 ربات در حال اجراست...")
-    application.run_polling()
+    try:
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+        
+        logger.info("🤖 ربات در حال اجراست...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except Exception as e:
+        logger.error(f"خطا در ربات: {e}")
 
 def main():
     # اجرای ربات در Thread جدا
-    bot_thread = Thread(target=run_bot)
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
+    logger.info("ربات Thread شروع شد")
     
+    # اجرای Flask
+    port = int(os.environ.get("PORT", 10000))
+    logger.info(f"Flask روی پورت {port} شروع میشه...")
+    app.run(host='0.0.0.0', port=port)
+
+if __name__ == "__main__":
+    main()    
     # اجرای Flask
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
