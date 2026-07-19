@@ -1,6 +1,6 @@
 import logging
 import os
-import yt_dlp
+import random
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -10,75 +10,60 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "سلام! 👋\n"
-        "من ربات دانلود YouTube هستم!\n\n"
-        "🔗 لینک ویدیوی YouTube رو بفرست تا برات دانلود کنم!\n\n"
-        "مثال:\n"
-        "https://youtube.com/watch?v=..."
+        "سلام دوست من! 👋\n"
+        "من ربات هوشمند هستم!\n\n"
+        "دستورات من:\n"
+        "/start - شروع\n"
+        "/help - راهنما\n"
+        "/dice - تاس انداختن 🎲\n"
+        "/coin - پرتاب سکه 🪙\n"
+        "/joke - یه جوک 😂\n\n"
+        "هر چی بگی برات تکرار میکنم! 😊"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📖 راهنما:\n\n"
-        "1️⃣ لینک ویدیوی YouTube رو کپی کن\n"
-        "2️⃣ اینجا Paste کن و بفرست\n"
-        "3️⃣ صبر کن تا دانلود بشه\n\n"
-        "⚠️ محدودیت: ویدیوهای زیر ۵۰ مگابایت"
+        "/start - شروع\n"
+        "/help - راهنما\n"
+        "/dice - تاس انداختن (۱ تا ۶)\n"
+        "/coin - پرتاب سکه (شیر یا خط)\n"
+        "/joke - یه جوک باحال\n\n"
+        "هر پیامی بفرستی برات تکرار میکنم!"
     )
 
-async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = update.message.text
-    
-    # بررسی لینک YouTube
-    if "youtube.com" not in url and "youtu.be" not in url:
-        await update.message.reply_text("❌ لطفاً یه لینک معتبر YouTube بفرست!")
-        return
-    
-    # پیام در حال دانلود
-    status_message = await update.message.reply_text("⏳ در حال دانلود... لطفاً صبر کنید")
-    
-    try:
-        # تنظیمات دانلود
-        ydl_opts = {
-            'format': 'best[filesize<50M]',  # زیر ۵۰ مگابایت
-            'outtmpl': 'video.%(ext)s',
-            'quiet': True,
-        }
-        
-        # دانلود
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            # ارسال ویدیو
-            await status_message.edit_text("✅ دانلود تموم شد! در حال ارسال...")
-            
-            with open(filename, 'rb') as video_file:
-                await update.message.reply_video(
-                    video=video_file,
-                    caption=f"🎬 {info.get('title', 'ویدیو')}\n\n✅ دانلود شد!"
-                )
-            
-            # پاک کردن فایل
-            if os.path.exists(filename):
-                os.remove(filename)
-            
-            await status_message.delete()
-            
-    except Exception as e:
-        await status_message.edit_text(f"❌ خطا: {str(e)}\n\nلطفاً لینک رو بررسی کنید")
+async def dice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    number = random.randint(1, 6)
+    await update.message.reply_text(f"🎲 تاس انداختی: {number}")
+
+async def coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    result = random.choice(["شیر 🦁", "خط 🦅"])
+    await update.message.reply_text(f"🪙 سکه پرتاب شد: {result}")
+
+async def joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    jokes = [
+        "چرا کامپیوتر به دکتر رفت؟ چون ویروس گرفته بود! 😂",
+        "برنامه‌نویس وارد رستوران شد. گارسون پرسید: چی میل دارید؟ گفت: منوی اصلی رو نشون بده! 😅",
+        "چرا جاوا اسکریپت به جاوا رفت؟ چون null بود! 🤣",
+        "برنامه‌نویس‌ها چرا تاریکی رو دوست دارن؟ چون نور باعث باگ میشه! 💡",
+    ]
+    await update.message.reply_text(random.choice(jokes))
+
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"تو گفتی: {update.message.text}")
 
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
-    logger.info("🤖 ربات دانلود YouTube در حال اجراست...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.add_handler(CommandHandler("dice", dice))
+    application.add_handler(CommandHandler("coin", coin))
+    application.add_handler(CommandHandler("joke", joke))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
