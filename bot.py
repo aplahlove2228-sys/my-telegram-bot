@@ -1,5 +1,6 @@
 import logging
 import os
+import yt_dlp
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -12,20 +13,71 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام دوست من! 👋\nربات آماده‌ست! چطور می‌تونم کمکت کنم؟")
+    await update.message.reply_text(
+        "سلام! 👋\n"
+        "من ربات دانلود YouTube هستم!\n\n"
+        "🔗 لینک ویدیوی YouTube رو بفرست تا برات دانلود کنم!\n\n"
+        "مثال:\n"
+        "https://youtube.com/watch?v=..."
+    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("دستورات من:\n/start - شروع\n/help - راهنما")
+    await update.message.reply_text(
+        "📖 راهنما:\n\n"
+        "1️⃣ لینک ویدیوی YouTube رو کپی کن\n"
+        "2️⃣ اینجا Paste کن و بفرست\n"
+        "3️⃣ صبر کن تا دانلود بشه\n\n"
+        "⚠️ محدودیت: ویدیوهای زیر ۵۰ مگابایت"
+    )
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"تو گفتی: {update.message.text}")
+async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = update.message.text
+    
+    # بررسی لینک YouTube
+    if "youtube.com" not in url and "youtu.be" not in url:
+        await update.message.reply_text("❌ لطفاً یه لینک معتبر YouTube بفرست!")
+        return
+    
+    # پیام در حال دانلود
+    status_message = await update.message.reply_text("⏳ در حال دانلود... لطفاً صبر کنید")
+    
+    try:
+        # تنظیمات دانلود
+        ydl_opts = {
+            'format': 'best[filesize<50M]',  # زیر ۵۰ مگابایت
+            'outtmpl': 'video.%(ext)s',
+            'quiet': True,
+        }
+        
+        # دانلود
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            
+            # ارسال ویدیو
+            await status_message.edit_text("✅ دانلود تموم شد! در حال ارسال...")
+            
+            with open(filename, 'rb') as video_file:
+                await update.message.reply_video(
+                    video=video_file,
+                    caption=f"🎬 {info.get('title', 'ویدیو')}\n\n✅ دانلود شد!"
+                )
+            
+            # پاک کردن فایل
+            if os.path.exists(filename):
+                os.remove(filename)
+            
+            await status_message.delete()
+            
+    except Exception as e:
+        await status_message.edit_text(f"❌ خطا: {str(e)}\n\nلطفاً لینک رو بررسی کنید")
 
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-    logger.info("🤖 ربات در حال اجراست...")
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
+    logger.info("🤖 ربات دانلود YouTube در حال اجراست...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
